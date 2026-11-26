@@ -1,0 +1,497 @@
+extends ../layout
+
+block content
+  .d-flex.justify-content-between.align-items-center.mb-4
+    h1.mb-0
+      i.bi.bi-calendar3.text-primary.me-2
+      | Cronograma de Pagos
+    .d-flex.gap-2
+      a.btn.btn-success(href="/prestamos/nuevo")
+        i.bi.bi-plus-circle.me-1
+        | Nuevo Préstamo
+      a.btn.btn-info(href="/pagos-servicios/nuevo")
+        i.bi.bi-plus-circle.me-1
+        | Nuevo Servicio
+
+  // Tarjetas de resumen
+  .row.mb-4
+    .col-md-4
+      .card.border-0.shadow-sm
+        .card-body
+          .d-flex.justify-content-between.align-items-center
+            div
+              h6.text-muted.mb-1 Total Préstamos Pendientes
+              h2.mb-0.text-warning S/ #{totalPrestamos ? totalPrestamos.toFixed(2) : '0.00'}
+            .bg-warning.bg-opacity-10.rounded-circle.p-3
+              i.bi.bi-bank.text-warning.fs-4
+    .col-md-4
+      .card.border-0.shadow-sm
+        .card-body
+          .d-flex.justify-content-between.align-items-center
+            div
+              h6.text-muted.mb-1 Servicios Pendientes
+              h2.mb-0.text-danger S/ #{totalServicios ? totalServicios.toFixed(2) : '0.00'}
+            .bg-danger.bg-opacity-10.rounded-circle.p-3
+              i.bi.bi-building.text-danger.fs-4
+    .col-md-4
+      .card.border-0.shadow-sm
+        .card-body
+          .d-flex.justify-content-between.align-items-center
+            div
+              h6.text-muted.mb-1 Total a Pagar
+              h2.mb-0.text-primary S/ #{(totalPrestamos + totalServicios).toFixed(2)}
+            .bg-primary.bg-opacity-10.rounded-circle.p-3
+              i.bi.bi-wallet2.text-primary.fs-4
+
+  // Control de mes/año
+  .card.border-0.shadow-sm.mb-4
+    .card-body
+      form(action="/cronograma", method="get", class="row g-3")
+        .col-md-4
+          label.form-label.fw-semibold Mes
+          select.form-control(name="mes")
+            each nombre, index in meses
+              option(value=index + 1, selected=(mes === index + 1))= nombre
+        .col-md-4
+          label.form-label.fw-semibold Año
+          input.form-control(type="number", name="anio", value=anio, min="2020", max="2030")
+        .col-md-4
+          label.form-label.fw-semibold &nbsp;
+          button.btn.btn-primary.w-100(type="submit")
+            i.bi.bi-calendar-event.me-1
+            | Ver calendario
+
+  // Calendario
+  .row.mb-4
+    .col-12
+      .card.border-0.shadow-sm
+        .card-header.bg-white.py-3
+          h5.mb-0.fw-bold
+            i.bi.bi-calendar-range.me-2
+            | Calendario de Pagos - #{meses[mes-1]} #{anio}
+        .card-body
+          .table-responsive
+            table.table.table-bordered.text-center
+              thead.table-light
+                tr
+                  th Domingo
+                  th Lunes
+                  th Martes
+                  th Miércoles
+                  th Jueves
+                  th Viernes
+                  th Sábado
+              tbody#calendarioBody
+
+  // Lista de préstamos activos y servicios pendientes
+  .row.mt-4
+    // PRÉSTAMOS ACTIVOS
+    .col-md-6
+      .card.border-0.shadow-sm
+        .card-header.bg-white.py-3.d-flex.justify-content-between.align-items-center
+          h5.mb-0.fw-bold
+            i.bi.bi-bank.me-2
+            | Préstamos Activos
+          if prestamos && prestamos.length > 0
+            span.badge.bg-warning #{prestamos.length} activos
+        .card-body
+          if prestamos && prestamos.length > 0
+            each prestamo in prestamos
+              .border-bottom.pb-3.mb-3
+                .d-flex.justify-content-between.align-items-center
+                  div
+                    strong #{prestamo.nombre}
+                    br
+                    small.text-muted #{prestamo.entidad}
+                  div.text-end
+                    span.badge.bg-warning S/ #{prestamo.saldoPendiente ? prestamo.saldoPendiente.toFixed(2) : '0.00'}
+                    br
+                    small.text-muted Cuotas: #{prestamo.cuotasPagadas || 0}/#{prestamo.cuotas}
+                
+                // Barra de progreso
+                .progress.mt-2(style="height: 8px;")
+                  .progress-bar.bg-success(
+                    role="progressbar",
+                    style=`width: ${((prestamo.montoTotal - prestamo.saldoPendiente) / prestamo.montoTotal * 100) || 0}%`
+                  )
+                
+                .d-flex.justify-content-between.mt-2
+                  .d-flex.gap-1
+                    button.btn.btn-sm.btn-success(
+                      type="button",
+                      data-bs-toggle="modal",
+                      data-bs-target="#modalPagarPrestamo",
+                      data-id=prestamo._id,
+                      data-nombre=prestamo.nombre,
+                      data-saldo=prestamo.saldoPendiente,
+                      data-cuota=(prestamo.cuotasPagadas || 0) + 1
+                    )
+                      i.bi.bi-cash-stack.me-1
+                      | Pagar Cuota
+                    
+                    a.btn.btn-sm.btn-outline-warning(
+                      href=`/prestamos/${prestamo._id}/editar`,
+                      title="Editar préstamo"
+                    )
+                      i.bi.bi-pencil
+                    
+                    // Solo mostrar eliminar si no tiene pagos
+                    if !prestamo.pagos || prestamo.pagos.length === 0
+                      form.d-inline(
+                        action=`/prestamos/${prestamo._id}?_method=DELETE`,
+                        method="post",
+                        onsubmit="return confirm('¿Estás seguro de eliminar este préstamo?')"
+                      )
+                        button.btn.btn-sm.btn-outline-danger(type="submit", title="Eliminar préstamo")
+                          i.bi.bi-trash
+                    else
+                      button.btn.btn-sm.btn-outline-secondary(
+                        type="button",
+                        title="No se puede eliminar, tiene pagos registrados",
+                        disabled
+                      )
+                        i.bi.bi-trash
+                  
+                  button.btn.btn-sm.btn-outline-secondary(
+                    type="button",
+                    data-bs-toggle="collapse",
+                    data-bs-target=`#historial${prestamo._id}`
+                  )
+                    i.bi.bi-clock-history.me-1
+                    | Historial (#{prestamo.pagos ? prestamo.pagos.length : 0})
+                
+                // Historial de pagos (colapsable)
+                .collapse.mt-2(id=`historial${prestamo._id}`)
+                  if prestamo.pagos && prestamo.pagos.length > 0
+                    .table-responsive
+                      table.table.table-sm.table-striped
+                        thead
+                          tr
+                            th Fecha
+                            th Cuota
+                            th Monto
+                            th Método
+                            th Acción
+                        tbody
+                          each pago in prestamo.pagos.slice().reverse()
+                            tr
+                              td= pago.fecha ? new Date(pago.fecha).toLocaleDateString('es-PE') : '—'
+                              td= pago.cuotaNumero || '—'
+                              td S/ #{pago.monto ? pago.monto.toFixed(2) : '0.00'}
+                              td= pago.metodoPago || '—'
+                              td
+                                form.d-inline(
+                                  action=`/prestamos/${prestamo._id}/pago/${pago._id}?_method=DELETE`,
+                                  method="post",
+                                  onsubmit="return confirm('¿Estás seguro de eliminar este pago?\\n\\n⚠️ Se eliminará el egreso asociado y se restaurará el saldo del préstamo.')"
+                                )
+                                  button.btn.btn-sm.btn-outline-danger(type="submit", title="Eliminar pago")
+                                    i.bi.bi-trash
+                  else
+                    p.text-muted No hay pagos registrados
+          else
+            .text-center.py-4
+              i.bi.bi-inbox.text-muted.fs-2.d-block.mb-2
+              p.text-muted No hay préstamos activos
+
+    // SERVICIOS PENDIENTES
+    .col-md-6
+      .card.border-0.shadow-sm
+        .card-header.bg-white.py-3.d-flex.justify-content-between.align-items-center
+          h5.mb-0.fw-bold
+            i.bi.bi-building.me-2
+            | Servicios Pendientes
+          if serviciosPendientes && serviciosPendientes.length > 0
+            span.badge.bg-danger #{serviciosPendientes.length} pendientes
+        .card-body
+          if serviciosPendientes && serviciosPendientes.length > 0
+            each servicio in serviciosPendientes
+              .border-bottom.pb-3.mb-3
+                .d-flex.justify-content-between.align-items-center
+                  div
+                    strong #{servicio.nombre}
+                    br
+                    small.text-muted #{servicio.categoria}
+                    // Mostrar si es recurrente
+                    if servicio.esRecurrente
+                      span.badge.bg-success.ms-1(style="font-size: 0.6rem;")
+                        i.bi.bi-arrow-repeat
+                        | Recurrente
+                  div.text-end
+                    span.badge.bg-danger S/ #{servicio.monto ? servicio.monto.toFixed(2) : '0.00'}
+                    br
+                    small.text-muted Vence: #{servicio.fechaVencimiento ? new Date(servicio.fechaVencimiento).toLocaleDateString('es-PE') : '—'}
+                
+                .d-flex.justify-content-between.mt-2
+                  .d-flex.gap-1
+                    button.btn.btn-sm.btn-success(
+                      type="button",
+                      data-bs-toggle="modal",
+                      data-bs-target="#modalPagarServicio",
+                      data-id=servicio._id,
+                      data-nombre=servicio.nombre,
+                      data-monto=servicio.monto
+                    )
+                      i.bi.bi-cash-stack.me-1
+                      | Pagar
+                    
+                    a.btn.btn-sm.btn-outline-warning(
+                      href=`/pagos-servicios/${servicio._id}/editar`,
+                      title="Editar servicio"
+                    )
+                      i.bi.bi-pencil
+                    
+                    // Solo mostrar eliminar si no tiene pagos
+                    if !servicio.pagos || servicio.pagos.length === 0
+                      form.d-inline(
+                        action=`/pagos-servicios/${servicio._id}?_method=DELETE`,
+                        method="post",
+                        onsubmit="return confirm('¿Estás seguro de eliminar este servicio?')"
+                      )
+                        button.btn.btn-sm.btn-outline-danger(type="submit", title="Eliminar servicio")
+                          i.bi.bi-trash
+                    else
+                      button.btn.btn-sm.btn-outline-secondary(
+                        type="button",
+                        title="No se puede eliminar, tiene pagos registrados",
+                        disabled
+                      )
+                        i.bi.bi-trash
+                  
+                  button.btn.btn-sm.btn-outline-secondary(
+                    type="button",
+                    data-bs-toggle="collapse",
+                    data-bs-target=`#historialServicio${servicio._id}`
+                  )
+                    i.bi.bi-clock-history.me-1
+                    | Historial (#{servicio.pagos ? servicio.pagos.length : 0})
+                
+                // Historial de pagos (colapsable)
+                .collapse.mt-2(id=`historialServicio${servicio._id}`)
+                  if servicio.pagos && servicio.pagos.length > 0
+                    .table-responsive
+                      table.table.table-sm.table-striped
+                        thead
+                          tr
+                            th Fecha
+                            th Mes/Año
+                            th Monto
+                            th Método
+                            th Acción
+                        tbody
+                          each pago in servicio.pagos.slice().reverse()
+                            tr
+                              td= pago.fecha ? new Date(pago.fecha).toLocaleDateString('es-PE') : '—'
+                              td= pago.mes && pago.anio ? `${pago.mes}/${pago.anio}` : '—'
+                              td S/ #{pago.monto ? pago.monto.toFixed(2) : '0.00'}
+                              td= pago.metodoPago || '—'
+                              td
+                                form.d-inline(
+                                  action=`/pagos-servicios/${servicio._id}/pago/${pago._id}?_method=DELETE`,
+                                  method="post",
+                                  onsubmit="return confirm('¿Estás seguro de eliminar este pago?\\n\\n⚠️ Se eliminará el egreso asociado y se restaurará el servicio a pendiente.')"
+                                )
+                                  button.btn.btn-sm.btn-outline-danger(type="submit", title="Eliminar pago")
+                                    i.bi.bi-trash
+                  else
+                    p.text-muted No hay pagos registrados
+          else
+            .text-center.py-4
+              i.bi.bi-inbox.text-muted.fs-2.d-block.mb-2
+              p.text-muted No hay servicios pendientes
+
+  // Modal para pagar préstamo
+  .modal.fade#modalPagarPrestamo(tabindex="-1")
+    .modal-dialog
+      .modal-content
+        .modal-header
+          h5.modal-title Pagar Cuota de Préstamo
+          button.btn-close(data-bs-dismiss="modal")
+        .modal-body
+          form(action="/prestamos/ID/pagar", method="post", id="formPagarPrestamo")
+            input(type="hidden", name="prestamoId", id="prestamoId")
+            .mb-3
+              label.form-label Préstamo
+              input.form-control(id="prestamoNombre", disabled)
+            .mb-3
+              label.form-label Saldo Pendiente
+              input.form-control(id="prestamoSaldo", disabled)
+            .mb-3
+              label.form-label N° Cuota
+              input.form-control(id="prestamoCuota", disabled)
+            .mb-3
+              label.form-label.fw-semibold Monto a Pagar
+              input.form-control(type="number", name="monto", id="montoPago", step="0.01", min="0.01", required)
+            .mb-3
+              label.form-label.fw-semibold Método de Pago
+              select.form-control(name="metodoPago")
+                each medio in ['Efectivo', 'Transferencia', 'Tarjeta', 'Yape/Plin', 'Otro']
+                  option(value=medio)= medio
+            .mb-3
+              label.form-label.fw-semibold Origen del Dinero
+              select.form-control(name="origen")
+                each origen in ['Efectivo', 'BCP', 'Interbank', 'Bim', 'Scotiabank', 'Otro']
+                  option(value=origen)= origen
+            .mb-3
+              label.form-label.fw-semibold Observación
+              textarea.form-control(name="observacion", rows="2", placeholder="Observaciones adicionales...")
+            button.btn.btn-success(type="submit")
+              i.bi.bi-cash-stack.me-1
+              | Pagar Cuota
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss="modal") Cancelar
+
+  // Modal para pagar servicio
+  .modal.fade#modalPagarServicio(tabindex="-1")
+    .modal-dialog
+      .modal-content
+        .modal-header
+          h5.modal-title Pagar Servicio
+          button.btn-close(data-bs-dismiss="modal")
+        .modal-body
+          form(action="/pagos-servicios/ID/pagar", method="post", id="formPagarServicio")
+            input(type="hidden", name="servicioId", id="servicioId")
+            .mb-3
+              label.form-label Servicio
+              input.form-control(id="servicioNombre", disabled)
+            .mb-3
+              label.form-label.fw-semibold Monto a Pagar
+              input.form-control(type="number", name="monto", id="montoServicioPago", step="0.01", min="0.01", required)
+            .mb-3
+              label.form-label.fw-semibold Método de Pago
+              select.form-control(name="metodoPago")
+                each medio in ['Efectivo', 'Transferencia', 'Tarjeta', 'Yape/Plin', 'Otro']
+                  option(value=medio)= medio
+            .mb-3
+              label.form-label.fw-semibold Origen del Dinero
+              select.form-control(name="origen")
+                each origen in ['Efectivo', 'BCP', 'Interbank', 'Bim', 'Scotiabank', 'Otro']
+                  option(value=origen)= origen
+            .mb-3
+              label.form-label.fw-semibold Observación
+              textarea.form-control(name="observacion", rows="2", placeholder="Observaciones adicionales...")
+            button.btn.btn-success(type="submit")
+              i.bi.bi-cash-stack.me-1
+              | Pagar
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss="modal") Cancelar
+
+  // Script para el calendario y modales
+  script.
+    // Función para generar el calendario
+    function generarCalendario(mes, anio) {
+      const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      
+      fetch(`/cronograma/api/eventos?mes=${mes}&anio=${anio}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) return;
+          
+          const eventos = data.eventos || [];
+          const primerDia = new Date(anio, mes - 1, 1).getDay();
+          const diasEnMes = new Date(anio, mes, 0).getDate();
+          
+          let html = '<tr>';
+          for (let i = 0; i < primerDia; i++) {
+            html += '<td></td>';
+          }
+          
+          for (let dia = 1; dia <= diasEnMes; dia++) {
+            const fecha = new Date(anio, mes - 1, dia);
+            const eventosDia = eventos.filter(e => {
+              const fechaEvento = new Date(e.fecha);
+              return fechaEvento.getDate() === dia && 
+                     fechaEvento.getMonth() === (mes - 1) &&
+                     fechaEvento.getFullYear() === anio;
+            });
+            
+            html += `<td style="height: 80px; vertical-align: top;">`;
+            html += `<strong>${dia}</strong>`;
+            
+            eventosDia.forEach(e => {
+              const color = e.tipo === 'prestamo' ? 'warning' : 'info';
+              html += `
+                <div class="badge bg-${color} d-block mt-1" style="font-size: 0.7rem; cursor: pointer;" 
+                     title="${e.title} - S/ ${e.monto ? e.monto.toFixed(2) : '0.00'}">
+                  ${e.title.substring(0, 10)}
+                </div>
+              `;
+            });
+            
+            html += `</td>`;
+            
+            if ((dia + primerDia) % 7 === 0 || dia === diasEnMes) {
+              html += '</tr>';
+              if (dia < diasEnMes) {
+                html += '<tr>';
+              }
+            }
+          }
+          
+          document.getElementById('calendarioBody').innerHTML = html;
+        })
+        .catch(error => {
+          console.error('Error al cargar eventos:', error);
+          document.getElementById('calendarioBody').innerHTML = `
+            <tr><td colspan="7" class="text-center text-danger py-3">
+              Error al cargar el calendario
+            </td></tr>
+          `;
+        });
+    }
+
+    // Configurar modales al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+      const mes = #{mes};
+      const anio = #{anio};
+      
+      // Generar calendario
+      generarCalendario(mes, anio);
+
+      // Configurar modal para pagar préstamo
+      document.querySelectorAll('[data-bs-target="#modalPagarPrestamo"]').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = this.dataset.id;
+          const nombre = this.dataset.nombre;
+          const saldo = this.dataset.saldo;
+          const cuota = this.dataset.cuota;
+          
+          document.getElementById('prestamoId').value = id;
+          document.getElementById('prestamoNombre').value = nombre;
+          document.getElementById('prestamoSaldo').value = saldo ? `S/ ${parseFloat(saldo).toFixed(2)}` : 'S/ 0.00';
+          document.getElementById('prestamoCuota').value = cuota || '1';
+          document.getElementById('montoPago').value = '';
+          document.getElementById('montoPago').placeholder = `Monto máximo: S/ ${saldo ? parseFloat(saldo).toFixed(2) : '0.00'}`;
+          document.getElementById('montoPago').max = saldo || 0;
+          
+          document.getElementById('formPagarPrestamo').action = `/prestamos/${id}/pagar`;
+        });
+      });
+
+      // Configurar modal para pagar servicio
+      document.querySelectorAll('[data-bs-target="#modalPagarServicio"]').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const id = this.dataset.id;
+          const nombre = this.dataset.nombre;
+          const monto = this.dataset.monto;
+          
+          document.getElementById('servicioId').value = id;
+          document.getElementById('servicioNombre').value = nombre;
+          document.getElementById('montoServicioPago').value = monto || '';
+          
+          document.getElementById('formPagarServicio').action = `/pagos-servicios/${id}/pagar`;
+        });
+      });
+    });
+
+    // Función para recargar el calendario después de un pago
+    function recargarCalendario() {
+      const mes = #{mes};
+      const anio = #{anio};
+      generarCalendario(mes, anio);
+      
+      // Recargar la página para actualizar las listas
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }

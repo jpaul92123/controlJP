@@ -1,0 +1,162 @@
+extends layout
+
+block content
+  .card.border-0.shadow-sm
+    .card-header.bg-white.py-3
+      h4.mb-0.fw-bold
+        i.bi.bi-arrow-down-circle.text-danger.me-2
+        = egreso ? '✏️ Editar Egreso' : '➕ Nuevo Egreso'
+    .card-body
+      form(action=egreso ? `/egresos/${egreso._id}?_method=PUT` : '/egresos', method="post", id="formEgreso")
+        .row.g-3
+          .col-md-6
+            // FECHA
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-calendar-event.me-1
+                | Fecha
+              input.form-control(
+                type="date", 
+                name="fecha", 
+                value=egreso ? formatDateInput(egreso.fecha) : '',
+                required
+              )
+            
+            // HORA (NUEVO CAMPO)
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-clock.me-1
+                | Hora
+              input.form-control(
+                type="time", 
+                name="hora", 
+                value=egreso ? (egreso.fecha ? new Date(egreso.fecha).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false }) : '00:00') : '00:00',
+                step="60"
+              )
+              small.text-muted Formato 24 horas (ej: 14:30)
+            
+            // CATEGORÍA
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-tag.me-1
+                | Categoría
+              select.form-control(name="categoria", required)
+                option(value="") Seleccione una categoría
+                each cat in ['Compra de mercadería', 'Compra de equipos', 'Compra de materiales', 'Compra de herramientas', 'Pago de personal', 'Adelanto de personal', 'Honorarios', 'Combustible', 'Pasajes', 'Taxi/movilidad', 'Peajes', 'Estacionamiento', 'Alimentación', 'Servicios', 'Internet', 'Telefonía', 'Alquiler', 'Publicidad', 'Software', 'Otros', 'Pago de préstamo', 'Intereses', 'Comisiones bancarias', 'Otros gastos']
+                  option(value=cat, selected=(egreso && egreso.categoria === cat))= cat
+            
+            // DESCRIPCIÓN
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-file-text.me-1
+                | Descripción
+              input.form-control(
+                type="text", 
+                name="descripcion", 
+                placeholder="Ej: Compra de materiales de seguridad", 
+                value=egreso ? egreso.descripcion : '',
+                required
+              )
+          
+          .col-md-6
+            // MONTO
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-cash.me-1
+                | Monto (S/)
+              input.form-control(
+                type="number", 
+                step="0.01", 
+                name="monto", 
+                placeholder="0.00", 
+                value=egreso ? egreso.monto : '',
+                min="0.01",
+                required
+              )
+            
+            // MEDIO DE PAGO
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-credit-card.me-1
+                | Medio de Pago
+              select.form-control(name="medioPago")
+                each medio in ['Efectivo', 'Transferencia', 'Tarjeta', 'Yape/Plin', 'Otro']
+                  option(value=medio, selected=(egreso && egreso.medioPago === medio))= medio
+            
+            // ORIGEN DEL DINERO
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-wallet2.me-1
+                | Origen del Dinero
+              select.form-control(name="origen")
+                each origen in ['Efectivo', 'BCP', 'Interbank', 'Bim', 'Scotiabank', 'Otro']
+                  option(value=origen, selected=(egreso && egreso.origen === origen))= origen
+        
+        // OBSERVACIÓN
+        .mb-3
+          label.form-label.fw-semibold
+            i.bi.bi-chat.me-1
+            | Observación
+          textarea.form-control(
+            name="observacion", 
+            rows="2", 
+            placeholder="Detalles adicionales..."
+          )= egreso ? egreso.observacion : ''
+        
+        // BOTONES
+        .d-flex.gap-2.mt-3
+          button.btn.btn-danger(type="submit")
+            i.bi.bi-check-circle.me-1
+            | Guardar
+          a.btn.btn-secondary(href="/egresos")
+            i.bi.bi-x-circle.me-1
+            | Cancelar
+
+  // Script para validación
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      const form = document.getElementById('formEgreso');
+      
+      form.addEventListener('submit', function(e) {
+        const monto = document.querySelector('input[name="monto"]');
+        const descripcion = document.querySelector('input[name="descripcion"]');
+        const categoria = document.querySelector('select[name="categoria"]');
+        
+        if (parseFloat(monto.value) <= 0) {
+          e.preventDefault();
+          alert('❌ El monto debe ser mayor a 0');
+          monto.focus();
+          return false;
+        }
+        
+        if (descripcion.value.trim() === '') {
+          e.preventDefault();
+          alert('❌ La descripción es obligatoria');
+          descripcion.focus();
+          return false;
+        }
+        
+        if (categoria.value === '') {
+          e.preventDefault();
+          alert('❌ Debes seleccionar una categoría');
+          categoria.focus();
+          return false;
+        }
+        
+        const fecha = document.querySelector('input[name="fecha"]');
+        if (!fecha.value) {
+          e.preventDefault();
+          alert('❌ Debes seleccionar una fecha');
+          fecha.focus();
+          return false;
+        }
+        
+        // Mostrar datos que se van a guardar (debug)
+        console.log('📅 Datos del formulario:');
+        console.log('Fecha:', fecha.value);
+        console.log('Hora:', document.querySelector('input[name="hora"]').value);
+        console.log('Categoría:', categoria.value);
+        console.log('Descripción:', descripcion.value);
+        console.log('Monto:', monto.value);
+      });
+    });

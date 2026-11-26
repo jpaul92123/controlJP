@@ -1,0 +1,254 @@
+extends layout
+
+block content
+  h1.mb-4 📊 Dashboard Financiero
+
+  // Tarjetas de resumen
+  .row.mb-4
+    .col-md-3
+      .card.text-white.bg-success
+        .card-body
+          h5.card-title
+            i.bi.bi-arrow-up-circle.me-2
+            | Ingresos (periodo)
+          p.card-text.display-6= totalIngresos.toFixed(2)
+    .col-md-3
+      .card.text-white.bg-danger
+        .card-body
+          h5.card-title
+            i.bi.bi-arrow-down-circle.me-2
+            | Egresos (periodo)
+          p.card-text.display-6= totalEgresos.toFixed(2)
+    .col-md-3
+      .card.text-white.bg-info
+        .card-body
+          h5.card-title
+            i.bi.bi-graph-up-arrow.me-2
+            | Resultado
+          p.card-text.display-6= resultado.toFixed(2)
+    .col-md-3
+      .card.text-white.bg-primary
+        .card-body
+          h5.card-title
+            i.bi.bi-wallet2.me-2
+            | Saldo Total
+          p.card-text.display-6= saldoTotal.toFixed(2)
+
+  // Filtros de periodo
+  form(action="/", method="get", class="mb-4")
+    .row.align-items-end
+      .col-md-3
+        label.form-label Filtro por periodo
+        select(name="periodo", class="form-select")
+          option(value="today" selected=(periodo === 'today')) Hoy
+          option(value="week" selected=(periodo === 'week')) Esta semana
+          option(value="month" selected=(periodo === 'month')) Este mes
+          option(value="previousMonth" selected=(periodo === 'previousMonth')) Mes anterior
+          option(value="year" selected=(periodo === 'year')) Este año
+          option(value="custom" selected=(periodo === 'custom')) Rango personalizado
+      .col-md-3
+        label.form-label Desde
+        input.form-control(type="date", name="fechaInicio", value=fechaInicio)
+      .col-md-3
+        label.form-label Hasta
+        input.form-control(type="date", name="fechaFin", value=fechaFin)
+      .col-md-3
+        button.btn.btn-primary(type="submit") Filtrar
+
+  // Botones de acción rápidos
+  .row.mb-3
+    .col-12
+      .d-flex.flex-wrap.gap-2
+        button.btn.btn-primary(type="button", data-bs-toggle="modal", data-bs-target="#nuevoMovimientoModal")
+          i.bi.bi-plus-circle.me-1
+          | Nuevo movimiento
+        a.btn.btn-success(href="/cronograma")
+          i.bi.bi-calendar3.me-1
+          | Cronograma de Pagos
+        a.btn.btn-warning(href="/prestamos")
+          i.bi.bi-bank.me-1
+          | Préstamos
+        a.btn.btn-info(href="/pagos-servicios")
+          i.bi.bi-building.me-1
+          | Servicios
+
+  // Modal para elegir tipo de movimiento
+  .modal.fade#nuevoMovimientoModal(tabindex="-1")
+    .modal-dialog
+      .modal-content
+        .modal-header
+          h5.modal-title Nuevo Movimiento
+          button.btn-close(data-bs-dismiss="modal")
+        .modal-body
+          form#formNuevoMovimiento
+            .mb-3
+              label.form-label Tipo de movimiento
+              select.form-control#tipoMovimiento
+                option(value="ingresos") Ingreso
+                option(value="egresos") Egreso
+            button.btn.btn-primary(type="submit") Continuar
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss="modal") Cancelar
+
+  // Gráficos
+  .row.mb-4
+    .col-md-8
+      canvas#chartBar
+    .col-md-4
+      h5
+        i.bi.bi-pie-chart.me-2
+        | Distribución de Egresos
+      canvas#chartPie
+
+  // Últimos movimientos
+  .row
+    .col
+      h3
+        i.bi.bi-clock-history.me-2
+        | Últimos movimientos
+      .table-responsive
+        table.table.table-striped
+          thead
+            tr
+              th Fecha
+              th Tipo
+              th Descripción
+              th Monto
+              th Destino/Origen
+          tbody
+            each mov in movimientos
+              tr
+                td= mov.fecha ? new Date(mov.fecha).toLocaleDateString('es-PE') : '—'
+                td
+                  if mov.tipoMovimiento === 'ingreso'
+                    span.badge.bg-success Ingreso
+                  else
+                    span.badge.bg-danger Egreso
+                td= mov.descripcion || '—'
+                td= (mov.tipoMovimiento === 'ingreso' ? '+' : '-') + (mov.monto ? mov.monto.toFixed(2) : '0.00')
+                td= mov.destino || mov.origen || '—'
+
+  // Scripts para gráficos y modal
+  script.
+    // Gráfico de barras
+    const ctxBar = document.getElementById('chartBar').getContext('2d');
+    new Chart(ctxBar, {
+      type: 'bar',
+      data: {
+        labels: !{JSON.stringify(labels)},
+        datasets: [
+          {
+            label: 'Ingresos',
+            data: !{JSON.stringify(ingresosMensuales)},
+            backgroundColor: 'rgba(40, 167, 69, 0.7)',
+            borderColor: 'rgba(40, 167, 69, 1)',
+            borderWidth: 1
+          },
+          {
+            label: 'Egresos',
+            data: !{JSON.stringify(egresosMensuales)},
+            backgroundColor: 'rgba(220, 53, 69, 0.7)',
+            borderColor: 'rgba(220, 53, 69, 1)',
+            borderWidth: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'top' },
+          title: { display: true, text: '📊 Ingresos vs Egresos mensuales' }
+        },
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    // Gráfico de torta (distribución de egresos)
+    const ctxPie = document.getElementById('chartPie').getContext('2d');
+    const distribucion = !{JSON.stringify(distribucion)};
+    
+    if (distribucion && distribucion.length > 0) {
+      const colores = [
+        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
+        '#9966FF', '#FF9F40', '#FF6384', '#36A2EB',
+        '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
+      ];
+      
+      new Chart(ctxPie, {
+        type: 'pie',
+        data: {
+          labels: distribucion.map(d => d._id),
+          datasets: [{
+            data: distribucion.map(d => d.total),
+            backgroundColor: colores.slice(0, distribucion.length)
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { 
+              position: 'bottom',
+              labels: {
+                font: { size: 10 }
+              }
+            },
+            title: {
+              display: true,
+              text: 'Distribución de Egresos'
+            }
+          }
+        }
+      });
+    } else {
+      ctxPie.canvas.parentElement.innerHTML = `
+        <div class="text-center py-5">
+          <i class="bi bi-pie-chart text-muted fs-1 d-block mb-3"></i>
+          <p class="text-muted">No hay datos de egresos para mostrar</p>
+        </div>
+      `;
+    }
+
+    // Manejo del modal para nuevo movimiento
+    document.getElementById('formNuevoMovimiento').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const tipo = document.getElementById('tipoMovimiento').value;
+      window.location.href = '/' + tipo + '/nuevo';
+    });
+
+    // Función para formatear fecha
+    function formatFecha(fecha) {
+      if (!fecha) return '—';
+      try {
+        const d = new Date(fecha);
+        return d.toLocaleDateString('es-PE', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return '—';
+      }
+    }
+
+    // Tooltips para los botones
+    document.addEventListener('DOMContentLoaded', function() {
+      // Inicializar tooltips de Bootstrap si están disponibles
+      if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+      }
+    });
+
+    console.log('📊 Dashboard cargado correctamente');
+    console.log('🔗 Enlaces disponibles:');
+    console.log('  - /cronograma → Cronograma de Pagos');
+    console.log('  - /prestamos → Préstamos');
+    console.log('  - /pagos-servicios → Servicios');

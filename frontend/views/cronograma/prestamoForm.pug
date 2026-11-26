@@ -1,0 +1,193 @@
+extends ../layout
+
+block content
+  .card.border-0.shadow-sm
+    .card-header.bg-white.py-3
+      h4.mb-0.fw-bold
+        i.bi.bi-bank.text-warning.me-2
+        = prestamo ? '✏️ Editar Préstamo' : '➕ Nuevo Préstamo'
+    .card-body
+      form(action=prestamo ? `/prestamos/${prestamo._id}?_method=PUT` : '/prestamos', method="post")
+        .row.g-3
+          .col-md-6
+            // NOMBRE DEL PRÉSTAMO
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-tag.me-1
+                | Nombre del Préstamo
+              input.form-control(
+                type="text",
+                name="nombre",
+                placeholder="Ej: Préstamo BCP",
+                value=prestamo ? prestamo.nombre : '',
+                required
+              )
+            
+            // ENTIDAD
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-building.me-1
+                | Entidad Financiera
+              input.form-control(
+                type="text",
+                name="entidad",
+                placeholder="Ej: BCP, Interbank, etc.",
+                value=prestamo ? prestamo.entidad : '',
+                required
+              )
+            
+            // MONTO DEL PRÉSTAMO (SIN INTERESES)
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-cash.me-1
+                | Monto del Préstamo (S/)
+              input.form-control(
+                type="number",
+                step="0.01",
+                name="montoPrestamo",
+                id="montoPrestamo",
+                placeholder="0.00",
+                value=prestamo ? prestamo.montoPrestamo : '',
+                min="0.01",
+                required
+              )
+              small.text-muted Monto original que te prestaron (sin intereses)
+            
+            // TASA DE INTERÉS
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-percent.me-1
+                | Tasa de Interés (%)
+              input.form-control(
+                type="number",
+                step="0.01",
+                name="tasaInteres",
+                id="tasaInteres",
+                placeholder="0.00",
+                value=prestamo ? prestamo.tasaInteres : '',
+                min="0"
+              )
+              small.text-muted Porcentaje de interés que cobra la entidad
+          
+          .col-md-6
+            // MONTO TOTAL CON INTERESES (AUTOCALCULADO)
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-calculator.me-1
+                | Monto Total a Pagar (S/)
+              .input-group
+                input.form-control(
+                  type="number",
+                  step="0.01",
+                  name="montoTotal",
+                  id="montoTotal",
+                  placeholder="Se calcula automáticamente",
+                  value=prestamo ? prestamo.montoTotal : '',
+                  min="0.01",
+                  readonly
+                )
+                button.btn.btn-outline-secondary(type="button", onclick="calcularTotal()")
+                  i.bi.bi-arrow-repeat
+              small.text-muted Monto total con intereses incluidos (se calcula automáticamente)
+            
+            // NÚMERO DE CUOTAS
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-list-ol.me-1
+                | Número de Cuotas
+              input.form-control(
+                type="number",
+                name="cuotas",
+                id="cuotas",
+                placeholder="Ej: 12",
+                value=prestamo ? prestamo.cuotas : '',
+                min="1",
+                required
+              )
+            
+            // FECHA DE INICIO
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-calendar-event.me-1
+                | Fecha de Inicio
+              input.form-control(
+                type="date",
+                name="fechaInicio",
+                value=prestamo ? formatDateInput(prestamo.fechaInicio) : '',
+                required
+              )
+            
+            // CATEGORÍA
+            .mb-3
+              label.form-label.fw-semibold
+                i.bi.bi-tags.me-1
+                | Categoría
+              select.form-control(name="categoria")
+                each cat in ['Préstamo bancario', 'Préstamo personal', 'Préstamo vehicular', 'Hipoteca', 'Tarjeta de crédito', 'Otro']
+                  option(value=cat, selected=(prestamo && prestamo.categoria === cat))= cat
+        
+        // OBSERVACIÓN
+        .mb-3
+          label.form-label.fw-semibold
+            i.bi.bi-chat.me-1
+            | Observación
+          textarea.form-control(
+            name="observacion",
+            rows="2",
+            placeholder="Detalles adicionales..."
+          )= prestamo ? prestamo.observacion : ''
+        
+        // RESUMEN (SI ES EDICIÓN)
+        if prestamo
+          .alert.alert-info
+            .row
+              .col-6
+                strong Saldo Pendiente:
+                |  S/ #{prestamo.saldoPendiente ? prestamo.saldoPendiente.toFixed(2) : '0.00'}
+              .col-6
+                strong Cuotas Pagadas:
+                |  #{prestamo.cuotasPagadas || 0} / #{prestamo.cuotas}
+        
+        .d-flex.gap-2.mt-3
+          button.btn.btn-success(type="submit")
+            i.bi.bi-check-circle.me-1
+            | Guardar
+          a.btn.btn-secondary(href="/cronograma")
+            i.bi.bi-x-circle.me-1
+            | Cancelar
+
+  // Script para calcular automáticamente el total con intereses
+  script.
+    function calcularTotal() {
+      const montoPrestamo = parseFloat(document.getElementById('montoPrestamo').value) || 0;
+      const tasaInteres = parseFloat(document.getElementById('tasaInteres').value) || 0;
+      
+      if (montoPrestamo > 0 && tasaInteres > 0) {
+        const montoInteres = (montoPrestamo * tasaInteres) / 100;
+        const montoTotal = montoPrestamo + montoInteres;
+        document.getElementById('montoTotal').value = montoTotal.toFixed(2);
+      } else if (montoPrestamo > 0) {
+        document.getElementById('montoTotal').value = montoPrestamo.toFixed(2);
+      } else {
+        document.getElementById('montoTotal').value = '';
+      }
+    }
+
+    // Eventos para calcular automáticamente
+    document.addEventListener('DOMContentLoaded', function() {
+      const montoPrestamoInput = document.getElementById('montoPrestamo');
+      const tasaInteresInput = document.getElementById('tasaInteres');
+      
+      if (montoPrestamoInput) {
+        montoPrestamoInput.addEventListener('input', calcularTotal);
+        montoPrestamoInput.addEventListener('change', calcularTotal);
+      }
+      
+      if (tasaInteresInput) {
+        tasaInteresInput.addEventListener('input', calcularTotal);
+        tasaInteresInput.addEventListener('change', calcularTotal);
+      }
+      
+      // Calcular al cargar si hay valores
+      calcularTotal();
+    });
